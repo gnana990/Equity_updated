@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options Chain - NSE Equity Project</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .strike-yellow {
+            background-color: #fbbf24 !important;
+            color: #1f2937 !important;
+            min-width: 140px;
+            font-weight: bold !important;
+        }
+        .current-row {
+            background-color: #fbbf24 !important;
+            color: #1f2937 !important;
+            font-weight: bold !important;
+        }
+        .negative-oi {
+            color: #dc2626 !important;
+            font-weight: bold !important;
+        }
+        .max-volume {
+            background-color: #3b82f6 !important;
+            color: white !important;
+            font-weight: bold !important;
+        }
+        .max-oi {
+            background-color: #dc2626 !important;
+            color: white !important;
+            font-weight: bold !important;
+        }
+        .loading-spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .table-container {
+            overflow-x: auto;
+            max-height: 70vh;
+            width: 100%;
+        }
+        .options-table {
+            min-width: 1200px;
+            width: 100%;
+        }
+        .options-table th,
+        .options-table td {
+            padding: 12px 16px;
+            text-align: center;
+            border: 1px solid #e5e7eb;
+            font-size: 14px;
+            min-width: 120px;
+            font-weight: bold !important;
+        }
+        .options-table th {
+            background: #f3f4f6;
+            font-weight: bold !important;
+            color: #1f2937;
+        }
+        .sortable {
+            cursor: pointer;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .sortable:hover {
+            background: #e5e7eb;
+        }
+        .symbol-select {
+            background: white !important;
+            color: #1f2937 !important;
+            font-weight: bold !important;
+            min-width: 120px !important;
+            border: 1px solid #d1d5db !important;
+        }
+        .symbol-select option {
+            background: white;
+            color: #1f2937;
+            padding: 8px;
+            font-weight: bold;
+        }
+        body {
+            background-color: white !important;
+            color: #1f2937 !important;
+        }
+        .header-section {
+            background: #f8fafc !important;
+            border-bottom: 1px solid #e5e7eb !important;
+        }
+        .controls-section {
+            background: #f8fafc !important;
+            border: 1px solid #e5e7eb !important;
+        }
+        .table-section {
+            background: white !important;
+            border: 1px solid #e5e7eb !important;
+        }
+        .modal-content {
+            background: white !important;
+            border: 1px solid #e5e7eb !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-white">
+    <!-- Header -->
+    <header class="header-section">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">NSE Options Chain</h1>
+                    <p class="text-gray-600 text-sm font-bold">Real-time data updates every 1 minute</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <p class="text-gray-800 text-sm font-bold">Welcome, <span id="userEmail">{{ session.email }}</span></p>
+                        <p class="text-gray-600 text-xs font-bold" id="lastUpdate">Last update: --</p>
+                    </div>
+                    
+                    <!-- Historical Data Button -->
+                    <a href="/historical-data" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 font-bold">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        <span>Historical Data</span>
+                    </a>
+                    
+                    <!-- Alerts History Button -->
+                    <a href="/alerts" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 font-bold">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                        <span>Alerts History</span>
+                    </a>
+                    
+                    <!-- Alert Settings Button -->
+                    <button id="alertSettingsBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 font-bold">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                        <span id="alertButtonText">Alerts</span>
+                        <div id="alertStatus" class="w-2 h-2 rounded-full bg-gray-400"></div>
+                    </button>
+                    
+                    <a href="/logout" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors font-bold">
+                        Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Controls Section -->
+    <div class="max-w-full mx-auto px-4 py-6">
+        <div class="controls-section rounded-xl p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                <div class="flex flex-col space-y-2">
+                    <label class="text-gray-800 font-bold text-sm">Symbol:</label>
+                    <select id="symbolSelect" title="Select NSE Symbol" class="symbol-select rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        {% for symbol in symbols %}
+                        <option value="{{ symbol }}" {% if symbol == 'NIFTY' %}selected{% endif %}>{{ symbol }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-gray-800 font-bold text-sm">Expiry Date:</label>
+                    <select id="expirySelect" title="Select Expiry Date" class="symbol-select rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-gray-800 font-bold text-sm">Lot Size:</label>
+                    <span id="lotSize" class="text-yellow-600 font-bold text-lg">75</span>
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-gray-800 font-bold text-sm">Current Price:</label>
+                    <span id="currentPrice" class="text-green-600 font-bold text-lg">--</span>
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-gray-800 font-bold text-sm">Expiry:</label>
+                    <span id="expiryDisplay" class="text-blue-600 font-bold text-lg">--</span>
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-gray-800 font-bold text-sm">Status:</label>
+                    <div class="flex items-center space-x-2">
+                        <div id="statusIndicator" class="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span id="statusText" class="text-green-600 text-sm font-bold">Live</span>
+                        <div id="refreshIndicator" class="hidden w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="hidden flex justify-center items-center py-8">
+            <div class="loading-spinner"></div>
+            <span class="ml-3 text-gray-800 font-bold">Loading options data...</span>
+        </div>
+
+        <!-- Options Chain Table -->
+        <div id="optionsTableContainer" class="table-section rounded-xl p-6">
+            <!-- Data Range Indicator -->
+            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="text-sm text-blue-800 font-bold">
+                    📊 Displaying 10 strikes above and below the current market price (ATM strike highlighted in yellow)
+                </p>
+            </div>
+            <div class="table-container">
+                <table class="options-table w-full">
+                    <thead>
+                        <tr>
+                            <!-- Calls Section -->
+                            <th colspan="3" class="bg-blue-600 text-white font-bold text-lg">CALLS (CE)</th>
+                            <!-- Strike Price -->
+                            <th class="bg-yellow-500 text-gray-800 font-bold text-lg">STRIKE PRICE</th>
+                            <!-- Puts Section -->
+                            <th colspan="3" class="bg-red-600 text-white font-bold text-lg">PUTS (PE)</th>
+                        </tr>
+                        <tr>
+                            <!-- Calls Headers -->
+                            <th class="sortable" data-sort="ce-oi-chg">OI Chg ↕</th>
+                            <th class="sortable" data-sort="ce-oi">OI ↕</th>
+                            <th class="sortable" data-sort="ce-volume">Volume ↕</th>
+                            <!-- Strike Price -->
+                            <th class="strike-yellow">Strike</th>
+                            <!-- Puts Headers -->
+                            <th class="sortable" data-sort="pe-volume">Volume ↕</th>
+                            <th class="sortable" data-sort="pe-oi">OI ↕</th>
+                            <th class="sortable" data-sort="pe-oi-chg">OI Chg ↕</th>
+                        </tr>
+                    </thead>
+                    <tbody id="optionsTableBody">
+                        <!-- Data will be populated by JavaScript -->
+                    </tbody>
+                    <tfoot>
+                        <tr class="bg-gray-100">
+                            <td class="font-bold text-gray-800">Total CE OI Chg: <span id="totalCEOIChg">--</span></td>
+                            <td class="font-bold text-gray-800">Total CE OI: <span id="totalCEOI">--</span></td>
+                            <td class="font-bold text-gray-800">Total CE Volume: <span id="totalCEVolume">--</span></td>
+                            <td class="strike-yellow font-bold">TOTALS</td>
+                            <td class="font-bold text-gray-800">Total PE Volume: <span id="totalPEVolume">--</span></td>
+                            <td class="font-bold text-gray-800">Total PE OI: <span id="totalPEOI">--</span></td>
+                            <td class="font-bold text-gray-800">Total PE OI Chg: <span id="totalPEOIChg">--</span></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Settings Modal -->
+    <div id="alertModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+        <div class="modal-content rounded-xl p-6 max-w-md w-full mx-4">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">Alert Settings</h3>
+                <button id="closeAlertModal" class="text-gray-500 hover:text-gray-700" title="Close Alert Settings">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="alertSettingsForm" class="space-y-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h4 class="text-sm font-bold text-blue-800 mb-2">📋 Alert Types Explained:</h4>
+                    <ul class="text-xs text-blue-700 space-y-1">
+                        <li><strong>🔴 Negative OI Change Alert:</strong> Triggers when OI change is negative and exceeds threshold (within 10 strikes above/below current price)</li>
+                        <li><strong>🟡 Total OI Change Alert:</strong> Triggers when total OI change exceeds threshold (either positive or negative)</li>
+                        <li><strong>🟢 Volume Comparison Alert:</strong> Triggers when today's end volume is multiplied by factor compared to tomorrow</li>
+                    </ul>
+                    <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <p class="text-xs text-yellow-800 font-bold">⚠️ Note: Alerts are disabled for major indices (NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY, SENSEX)</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="flex items-center space-x-3">
+                        <input type="checkbox" id="enableAlerts" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+                        <span class="text-gray-800 font-bold">Enable Email Alerts</span>
+                    </label>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
+                        <span style="color: #dc2626;">🔴</span> Negative OI Change Threshold
+                    </label>
+                    <input type="number" id="negativeOIThreshold" value="-100" title="Negative OI Change Threshold" class="w-full px-3 py-2 bg-white border border-red-300 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 font-bold">
+                    <p class="text-xs text-red-600 mt-1 font-bold">Alert when OI change is negative and exceeds this value (within 10 strikes from current price)</p>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
+                        <span style="color: #f59e0b;">🟡</span> Total OI Change Threshold
+                    </label>
+                    <input type="number" id="totalOIThreshold" value="1500" title="Total OI Change Threshold" class="w-full px-3 py-2 bg-white border border-yellow-300 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 font-bold">
+                    <p class="text-xs text-yellow-600 mt-1 font-bold">Alert when total OI change exceeds this value (either positive or negative)</p>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
+                        <span style="color: #10b981;">🟢</span> Volume Comparison Multiplier
+                    </label>
+                    <input type="number" id="volumeMultiplier" value="2" min="1" max="10" step="0.5" title="Volume Comparison Multiplier" class="w-full px-3 py-2 bg-white border border-green-300 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 font-bold">
+                    <p class="text-xs text-green-600 mt-1 font-bold">Alert when today's end volume is multiplied by this factor compared to tomorrow</p>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Alert Cooldown (minutes)</label>
+                    <input type="number" id="alertCooldown" value="5" min="1" max="60" title="Alert Cooldown" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold">
+                    <p class="text-xs text-gray-500 mt-1 font-bold">Minimum time between alerts (1-60 minutes)</p>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Alert Types</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center space-x-3">
+                            <input type="checkbox" id="alertCalls" checked class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+                            <span class="text-gray-800 font-bold">CALLS (CE)</span>
+                        </label>
+                        <label class="flex items-center space-x-3">
+                            <input type="checkbox" id="alertPuts" checked class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+                            <span class="text-gray-800 font-bold">PUTS (PE)</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="flex space-x-3 pt-4">
+                    <button type="submit" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                        Save Settings
+                    </button>
+                    <button type="button" id="cancelAlertSettings" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+        let updateInterval = null;
+        
+        // Alert settings
+        let alertSettings = {
+            enabled: false,
+            negativeOIThreshold: -100,
+            totalOIThreshold: 1500,
+            volumeMultiplier: 2,
+            cooldown: 300, // 5 minutes in seconds
+            alertCalls: true,
+            alertPuts: true
+        };
+
+        // Format numbers with commas
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        // Update the options chain table
+        function updateOptionsTable(data) {
+            const tbody = document.getElementById('optionsTableBody');
+            tbody.innerHTML = '';
+
+            if (!data || !data.calls || !data.puts) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-600 py-8">No data available</td></tr>';
+                return;
+            }
+
+            // Find current ATM strike (closest to current price)
+            const currentPrice = data.current_price;
+            const strikes = data.calls.map(call => call.strike);
+            const atmStrike = strikes.reduce((prev, curr) => 
+                Math.abs(curr - currentPrice) < Math.abs(prev - currentPrice) ? curr : prev
+            );
+
+            // Find the index of ATM strike
+            const atmIndex = data.calls.findIndex(call => call.strike === atmStrike);
+            
+            // Calculate start and end indices to show only 10 rows above and below ATM
+            const startIndex = Math.max(0, atmIndex - 10);
+            const endIndex = Math.min(data.calls.length, atmIndex + 11); // +11 to include ATM row
+
+            // Find max values for highlighting (only for visible rows)
+            const visibleCalls = data.calls.slice(startIndex, endIndex);
+            const visiblePuts = data.puts.slice(startIndex, endIndex);
+            
+            const maxCEVolume = Math.max(...visibleCalls.map(c => c.volume));
+            const maxCEOI = Math.max(...visibleCalls.map(c => c.oi));
+            const maxCEOIChg = Math.max(...visibleCalls.map(c => c.oi_chg));
+            const maxPEVolume = Math.max(...visiblePuts.map(p => p.volume));
+            const maxPEOI = Math.max(...visiblePuts.map(p => p.oi));
+            const maxPEOIChg = Math.max(...visiblePuts.map(p => p.oi_chg));
+
+            // Create rows for visible range only
+            for (let i = startIndex; i < endIndex; i++) {
+                const call = data.calls[i];
+                const put = data.puts[i];
+                const strike = call.strike;
+                const isCurrentRow = strike === atmStrike;
+
+                const row = document.createElement('tr');
+                if (isCurrentRow) {
+                    row.className = 'current-row';
+                }
+
+                // Calls data
+                const ceOICell = document.createElement('td');
+                // Display OI change in lots
+                const ceOIChgLots = call.oi_chg_lots || (call.oi_chg / data.lot_size);
+                ceOICell.textContent = formatNumber(ceOIChgLots);
+                
+                // Color coding for OI change
+                if (ceOIChgLots === 0) {
+                    ceOICell.className = 'text-gray-400'; // Gray for no change
+                } else if (ceOIChgLots < 0) {
+                    ceOICell.className = 'negative-oi text-red-500 font-semibold'; // Red for negative
+                } else if (ceOIChgLots > 0) {
+                    ceOICell.className = 'text-green-500 font-semibold'; // Green for positive
+                }
+                
+                if (call.oi_chg === maxCEOIChg) ceOICell.className += ' max-oi';
+
+                const ceOICell2 = document.createElement('td');
+                // Display OI in lots
+                const ceOILots = call.oi_lots || (call.oi / data.lot_size);
+                ceOICell2.textContent = formatNumber(ceOILots);
+                if (call.oi === maxCEOI) ceOICell2.className = 'max-oi';
+
+                const ceVolumeCell = document.createElement('td');
+                // Display volume in lots (volume_lots) if available, otherwise convert from contracts
+                const ceVolumeLots = call.volume_lots || (call.volume / data.lot_size);
+                ceVolumeCell.textContent = formatNumber(ceVolumeLots);
+                if (call.volume === maxCEVolume) ceVolumeCell.className = 'max-volume';
+
+                // Strike price
+                const strikeCell = document.createElement('td');
+                strikeCell.textContent = strike;
+                strikeCell.className = 'strike-yellow';
+
+                // Puts data
+                const peVolumeCell = document.createElement('td');
+                // Display volume in lots (volume_lots) if available, otherwise convert from contracts
+                const peVolumeLots = put.volume_lots || (put.volume / data.lot_size);
+                peVolumeCell.textContent = formatNumber(peVolumeLots);
+                if (put.volume === maxPEVolume) peVolumeCell.className = 'max-volume';
+
+                const peOICell = document.createElement('td');
+                // Display OI in lots
+                const peOILots = put.oi_lots || (put.oi / data.lot_size);
+                peOICell.textContent = formatNumber(peOILots);
+                if (put.oi === maxPEOI) peOICell.className = 'max-oi';
+
+                const peOIChgCell = document.createElement('td');
+                // Display OI change in lots
+                const peOIChgLots = put.oi_chg_lots || (put.oi_chg / data.lot_size);
+                peOIChgCell.textContent = formatNumber(peOIChgLots);
+                
+                // Color coding for OI change
+                if (peOIChgLots === 0) {
+                    peOIChgCell.className = 'text-gray-400'; // Gray for no change
+                } else if (peOIChgLots < 0) {
+                    peOIChgCell.className = 'negative-oi text-red-500 font-semibold'; // Red for negative
+                } else if (peOIChgLots > 0) {
+                    peOIChgCell.className = 'text-green-500 font-semibold'; // Green for positive
+                }
+                
+                if (put.oi_chg === maxPEOIChg) peOIChgCell.className += ' max-oi';
+
+                row.appendChild(ceOICell);
+                row.appendChild(ceOICell2);
+                row.appendChild(ceVolumeCell);
+                row.appendChild(strikeCell);
+                row.appendChild(peVolumeCell);
+                row.appendChild(peOICell);
+                row.appendChild(peOIChgCell);
+
+                tbody.appendChild(row);
+            }
+
+            // Update totals (only for visible rows)
+            const totalCEOIChg = visibleCalls.reduce((sum, call) => sum + call.oi_chg, 0);
+            const totalCEOI = visibleCalls.reduce((sum, call) => sum + call.oi, 0);
+            const totalCEVolume = visibleCalls.reduce((sum, call) => sum + call.volume, 0);
+            const totalPEVolume = visiblePuts.reduce((sum, put) => sum + put.volume, 0);
+            const totalPEOI = visiblePuts.reduce((sum, put) => sum + put.oi, 0);
+            const totalPEOIChg = visiblePuts.reduce((sum, put) => sum + put.oi_chg, 0);
+
+            // Calculate totals in lots (only for visible rows)
+            const totalCEOIChgLots = visibleCalls.reduce((sum, call) => sum + (call.oi_chg_lots || 0), 0);
+            const totalCEOILots = visibleCalls.reduce((sum, call) => sum + (call.oi_lots || 0), 0);
+            const totalCEVolumeLots = visibleCalls.reduce((sum, call) => sum + (call.volume_lots || 0), 0);
+            const totalPEOIChgLots = visiblePuts.reduce((sum, put) => sum + (put.oi_chg_lots || 0), 0);
+            const totalPEOILots = visiblePuts.reduce((sum, put) => sum + (put.oi_lots || 0), 0);
+            const totalPEVolumeLots = visiblePuts.reduce((sum, put) => sum + (put.volume_lots || 0), 0);
+
+            document.getElementById('totalCEOIChg').textContent = formatNumber(totalCEOIChgLots);
+            document.getElementById('totalCEOI').textContent = formatNumber(totalCEOILots);
+            document.getElementById('totalCEVolume').textContent = formatNumber(totalCEVolumeLots);
+            document.getElementById('totalPEVolume').textContent = formatNumber(totalPEVolumeLots);
+            document.getElementById('totalPEOI').textContent = formatNumber(totalPEOILots);
+            document.getElementById('totalPEOIChg').textContent = formatNumber(totalPEOIChgLots);
+
+            // Update header info
+            document.getElementById('currentPrice').textContent = currentPrice.toFixed(2);
+            document.getElementById('lotSize').textContent = data.lot_size;
+            
+            // Update expiry date display
+            const expiryDisplay = document.getElementById('expiryDisplay');
+            if (expiryDisplay) {
+                expiryDisplay.textContent = data.expiry_date;
+            }
+        }
+
+        // Fetch expiry dates for a symbol
+        async function fetchExpiryDates(symbol) {
+            try {
+                const response = await fetch(`/get-expiry-dates?symbol=${symbol}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch expiry dates');
+                }
+                
+                const data = await response.json();
+                const expirySelect = document.getElementById('expirySelect');
+                expirySelect.innerHTML = '';
+                
+                data.expiry_dates.forEach(expiry => {
+                    const option = document.createElement('option');
+                    option.value = expiry;
+                    option.textContent = expiry;
+                    expirySelect.appendChild(option);
+                });
+                
+                // Select first expiry by default
+                if (data.expiry_dates.length > 0) {
+                    expirySelect.value = data.expiry_dates[0];
+                }
+                
+            } catch (error) {
+                console.error('Error fetching expiry dates:', error);
+                const expirySelect = document.getElementById('expirySelect');
+                expirySelect.innerHTML = '<option value="">Error loading</option>';
+            }
+        }
+
+        // Initial load with loading spinner
+        async function initialLoad() {
+            const symbol = document.getElementById('symbolSelect').value;
+            const expiry = document.getElementById('expirySelect').value;
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const tableContainer = document.getElementById('optionsTableContainer');
+
+            if (!expiry) return;
+
+            try {
+                loadingSpinner.classList.remove('hidden');
+                tableContainer.classList.add('hidden');
+
+                const response = await fetch(`/get-option-data?symbol=${symbol}&expiry=${expiry}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+
+                const data = await response.json();
+                currentData = data;
+
+                updateOptionsTable(data);
+                updateLastUpdateTime();
+
+                loadingSpinner.classList.add('hidden');
+                tableContainer.classList.remove('hidden');
+
+                // Update status
+                document.getElementById('statusIndicator').className = 'w-3 h-3 bg-green-500 rounded-full';
+                document.getElementById('statusText').textContent = 'Live';
+                document.getElementById('statusText').className = 'text-green-600 text-sm font-bold';
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                
+                loadingSpinner.classList.add('hidden');
+                tableContainer.classList.remove('hidden');
+
+                // Update status
+                document.getElementById('statusIndicator').className = 'w-3 h-3 bg-red-500 rounded-full';
+                document.getElementById('statusText').textContent = 'Error';
+                document.getElementById('statusText').className = 'text-red-600 text-sm font-bold';
+            }
+        }
+
+        // Background refresh without loading spinner
+        async function fetchOptionsData() {
+            const symbol = document.getElementById('symbolSelect').value;
+            const expiry = document.getElementById('expirySelect').value;
+            const refreshIndicator = document.getElementById('refreshIndicator');
+
+            if (!expiry) return;
+
+            try {
+                // Show refresh indicator
+                refreshIndicator.classList.remove('hidden');
+
+                const response = await fetch(`/get-option-data?symbol=${symbol}&expiry=${expiry}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+
+                const data = await response.json();
+                currentData = data;
+
+                updateOptionsTable(data);
+                updateLastUpdateTime();
+
+                // Update status
+                document.getElementById('statusIndicator').className = 'w-3 h-3 bg-green-500 rounded-full';
+                document.getElementById('statusText').textContent = 'Live';
+                document.getElementById('statusText').className = 'text-green-600 text-sm font-bold';
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                
+                // Update status
+                document.getElementById('statusIndicator').className = 'w-3 h-3 bg-red-500 rounded-full';
+                document.getElementById('statusText').textContent = 'Error';
+                document.getElementById('statusText').className = 'text-red-600 text-sm font-bold';
+            } finally {
+                // Hide refresh indicator
+                refreshIndicator.classList.add('hidden');
+            }
+        }
+
+        // Update last update time
+        function updateLastUpdateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-IN', { 
+                timeZone: 'Asia/Kolkata',
+                hour12: false 
+            });
+            document.getElementById('lastUpdate').textContent = `Last update: ${timeString}`;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Load saved alert settings
+            await loadSavedAlertSettings();
+            
+            // Initial setup
+            const initialSymbol = document.getElementById('symbolSelect').value;
+            fetchExpiryDates(initialSymbol).then(() => {
+                initialLoad(); // Use initialLoad for first load with spinner
+            });
+
+            // Set up interval for updates (every 2 minutes)
+            updateInterval = setInterval(fetchOptionsData, 120000); // 2 minutes
+
+            // Symbol change handler
+            document.getElementById('symbolSelect').addEventListener('change', function() {
+                const symbol = this.value;
+                fetchExpiryDates(symbol).then(() => {
+                    initialLoad(); // Use initialLoad for symbol change with spinner
+                });
+            });
+
+            // Expiry change handler
+            document.getElementById('expirySelect').addEventListener('change', function() {
+                initialLoad(); // Use initialLoad for expiry change with spinner
+            });
+
+            // Sorting functionality
+            document.querySelectorAll('.sortable').forEach(header => {
+                header.addEventListener('click', function() {
+                    const sortKey = this.dataset.sort;
+                    // Implement sorting logic here if needed
+                    console.log('Sort by:', sortKey);
+                });
+            });
+        });
+
+        // Alert Settings Modal Functions
+        function openAlertModal() {
+            document.getElementById('alertModal').classList.remove('hidden');
+            loadAlertSettings();
+        }
+        
+        function closeAlertModal() {
+            document.getElementById('alertModal').classList.add('hidden');
+        }
+        
+        function loadAlertSettings() {
+            // Load current settings into form
+            document.getElementById('enableAlerts').checked = alertSettings.enabled;
+            document.getElementById('negativeOIThreshold').value = alertSettings.negativeOIThreshold;
+            document.getElementById('totalOIThreshold').value = alertSettings.totalOIThreshold;
+            document.getElementById('volumeMultiplier').value = alertSettings.volumeMultiplier;
+            document.getElementById('alertCooldown').value = alertSettings.cooldown / 60; // Convert to minutes
+            document.getElementById('alertCalls').checked = alertSettings.alertCalls;
+            document.getElementById('alertPuts').checked = alertSettings.alertPuts;
+        }
+        
+        async function saveAlertSettings() {
+            // Save settings from form
+            alertSettings.enabled = document.getElementById('enableAlerts').checked;
+            alertSettings.negativeOIThreshold = parseInt(document.getElementById('negativeOIThreshold').value);
+            alertSettings.totalOIThreshold = parseInt(document.getElementById('totalOIThreshold').value);
+            alertSettings.volumeMultiplier = parseFloat(document.getElementById('volumeMultiplier').value);
+            alertSettings.cooldown = parseInt(document.getElementById('alertCooldown').value) * 60; // Convert to seconds
+            alertSettings.alertCalls = document.getElementById('alertCalls').checked;
+            alertSettings.alertPuts = document.getElementById('alertPuts').checked;
+            
+            try {
+                // Save to backend
+                const response = await fetch('/save-alert-settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        enabled: alertSettings.enabled,
+                        negativeOIThreshold: alertSettings.negativeOIThreshold,
+                        totalOIThreshold: alertSettings.totalOIThreshold,
+                        volumeMultiplier: alertSettings.volumeMultiplier,
+                        cooldown: alertSettings.cooldown,
+                        alertCalls: alertSettings.alertCalls,
+                        alertPuts: alertSettings.alertPuts
+                    })
+                });
+                
+                if (response.ok) {
+                    // Save to localStorage as backup
+                    localStorage.setItem('alertSettings', JSON.stringify(alertSettings));
+                    
+                    // Update button status
+                    updateAlertButtonStatus();
+                    
+                    // Show success message
+                    alert('Alert settings saved successfully!');
+                    closeAlertModal();
+                } else {
+                    alert('Failed to save alert settings. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error saving alert settings:', error);
+                alert('Error saving alert settings. Please try again.');
+            }
+        }
+        
+        function updateAlertButtonStatus() {
+            const alertStatus = document.getElementById('alertStatus');
+            const alertButtonText = document.getElementById('alertButtonText');
+            
+            if (alertSettings.enabled) {
+                alertStatus.className = 'w-2 h-2 rounded-full bg-green-500';
+                alertButtonText.textContent = 'Alerts ON';
+            } else {
+                alertStatus.className = 'w-2 h-2 rounded-full bg-gray-400';
+                alertButtonText.textContent = 'Alerts OFF';
+            }
+        }
+        
+        async function loadSavedAlertSettings() {
+            try {
+                // Try to load from backend first
+                const response = await fetch('/get-alert-settings');
+                if (response.ok) {
+                    const backendSettings = await response.json();
+                    alertSettings = {
+                        enabled: backendSettings.enabled || false,
+                        negativeOIThreshold: backendSettings.negative_oi_threshold || -100,
+                        totalOIThreshold: backendSettings.total_oi_threshold || 1500,
+                        volumeMultiplier: backendSettings.volume_multiplier || 2,
+                        cooldown: backendSettings.cooldown || 300,
+                        alertCalls: backendSettings.alert_calls || true,
+                        alertPuts: backendSettings.alert_puts || true
+                    };
+                } else {
+                    // Fallback to localStorage
+                    const saved = localStorage.getItem('alertSettings');
+                    if (saved) {
+                        alertSettings = { ...alertSettings, ...JSON.parse(saved) };
+                    }
+                }
+                
+                // Update button status
+                updateAlertButtonStatus();
+            } catch (error) {
+                console.error('Error loading alert settings:', error);
+                // Fallback to localStorage
+                const saved = localStorage.getItem('alertSettings');
+                if (saved) {
+                    alertSettings = { ...alertSettings, ...JSON.parse(saved) };
+                }
+                
+                // Update button status
+                updateAlertButtonStatus();
+            }
+        }
+        
+        // Modal event listeners
+        document.getElementById('alertSettingsBtn').addEventListener('click', openAlertModal);
+        document.getElementById('closeAlertModal').addEventListener('click', closeAlertModal);
+        document.getElementById('cancelAlertSettings').addEventListener('click', closeAlertModal);
+        document.getElementById('alertSettingsForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveAlertSettings();
+        });
+        
+        // Close modal when clicking outside
+        document.getElementById('alertModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAlertModal();
+            }
+        });
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historical Data - NSE Equity Project</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #3b82f6 100%);
+        }
+        .symbol-select {
+            background: rgba(255, 255, 255, 0.9) !important;
+            color: #1f2937 !important;
+            font-weight: 500 !important;
+            min-width: 120px !important;
+        }
+        .symbol-select option {
+            background: white;
+            color: #1f2937;
+            padding: 8px;
+        }
+        .loading-spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .table-container {
+            overflow-x: auto;
+            max-height: 70vh;
+            width: 100%;
+        }
+        .historical-table {
+            min-width: 1000px;
+            width: 100%;
+        }
+        .historical-table th,
+        .historical-table td {
+            padding: 12px 16px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 14px;
+            min-width: 120px;
+            font-weight: bold !important;
+        }
+        .historical-table th {
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: bold !important;
+            color: white;
+        }
+        .historical-table tbody tr {
+            color: white;
+        }
+        .historical-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .date-select {
+            background: rgba(255, 255, 255, 0.9) !important;
+            color: #1f2937 !important;
+            font-weight: 500 !important;
+            min-width: 150px !important;
+        }
+        .time-select {
+            background: rgba(255, 255, 255, 0.9) !important;
+            color: #1f2937 !important;
+            font-weight: 500 !important;
+            min-width: 120px !important;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen">
+    <!-- Header -->
+    <header class="glass border-b border-white border-opacity-20">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-white">Historical Data Analysis</h1>
+                    <p class="text-gray-300 text-sm">Past 2 days data from 9:00 AM to 4:00 PM (every 2 minutes)</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <p class="text-white text-sm">Welcome, <span id="userEmail">{{ session.email }}</span></p>
+                        <p class="text-gray-300 text-xs" id="lastUpdate">Last update: --</p>
+                    </div>
+                    <a href="/options-chain" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        Back to Options Chain
+                    </a>
+                    <a href="/logout" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Controls Section -->
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <div class="glass rounded-xl p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="flex flex-col space-y-2">
+                    <label class="text-white font-medium text-sm">Symbol:</label>
+                    <select id="symbolSelect" title="Select NSE Symbol" class="symbol-select border border-white border-opacity-30 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white focus:border-white">
+                        {% for symbol in symbols %}
+                        <option value="{{ symbol }}" {% if symbol == 'NIFTY' %}selected{% endif %}>{{ symbol }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-white font-medium text-sm">Expiry Date:</label>
+                    <select id="expirySelect" title="Select Expiry Date" class="symbol-select border border-white border-opacity-30 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white focus:border-white">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-white font-medium text-sm">Date:</label>
+                    <select id="dateSelect" title="Select Date" class="date-select border border-white border-opacity-30 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white focus:border-white">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-white font-medium text-sm">Time Range:</label>
+                    <select id="timeRangeSelect" title="Select Time Range" class="time-select border border-white border-opacity-30 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white focus:border-white">
+                        <option value="all">All Day (9:00 AM - 4:00 PM)</option>
+                        <option value="morning">Morning (9:00 AM - 12:00 PM)</option>
+                        <option value="afternoon">Afternoon (12:00 PM - 4:00 PM)</option>
+                        <option value="custom">Custom Time Range</option>
+                    </select>
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-white font-medium text-sm">Custom Time:</label>
+                    <div class="flex space-x-2">
+                        <input type="time" id="startTime" value="09:00" min="09:00" max="16:00" title="Start Time" class="time-select border border-white border-opacity-30 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white focus:border-white" disabled>
+                        <input type="time" id="endTime" value="16:00" min="09:00" max="16:00" title="End Time" class="time-select border border-white border-opacity-30 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white focus:border-white" disabled>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filter Button -->
+            <div class="mt-4 flex justify-center">
+                <button id="filterButton" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors font-bold">
+                    Apply Filters
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="hidden flex justify-center items-center py-8">
+            <div class="loading-spinner"></div>
+            <span class="ml-3 text-white">Loading historical data...</span>
+        </div>
+
+        <!-- Data Summary -->
+        <div id="dataSummary" class="glass rounded-xl p-6 mb-6 hidden">
+            <h3 class="text-xl font-bold text-white mb-4">Data Summary</h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-white">
+                <div class="text-center">
+                    <p class="text-2xl font-bold" id="totalRecords">0</p>
+                    <p class="text-sm text-gray-300">Total Records</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold" id="dateRange">--</p>
+                    <p class="text-sm text-gray-300">Date Range</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold" id="timeRange">--</p>
+                    <p class="text-sm text-gray-300">Time Range</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold" id="avgPCR">0.00</p>
+                    <p class="text-sm text-gray-300">Average PCR</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historical Data Table -->
+        <div id="historicalTableContainer" class="glass rounded-xl p-6">
+            <h3 class="text-xl font-bold text-white mb-4">Historical Data Table</h3>
+            <div class="table-container">
+                <table class="historical-table w-full">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Current Price</th>
+                            <th>CE OI</th>
+                            <th>PE OI</th>
+                            <th>CE Volume</th>
+                            <th>PE Volume</th>
+                            <th>PCR</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historicalTableBody">
+                        <!-- Data will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+
+        // Format numbers with commas
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        // Get available dates (last 2 days)
+        function getAvailableDates() {
+            const dates = [];
+            const today = new Date();
+            
+            // Get last 2 days
+            for (let i = 0; i < 2; i++) {
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+                const displayStr = date.toLocaleDateString('en-IN', { 
+                    weekday: 'short', 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                });
+                dates.push({ value: dateStr, display: displayStr });
+            }
+            return dates;
+        }
+
+        // Populate date select
+        function populateDateSelect() {
+            const dateSelect = document.getElementById('dateSelect');
+            const dates = getAvailableDates();
+            
+            dateSelect.innerHTML = '<option value="">All Dates</option>';
+            dates.forEach(date => {
+                const option = document.createElement('option');
+                option.value = date.value;
+                option.textContent = date.display;
+                dateSelect.appendChild(option);
+            });
+        }
+
+        // Fetch expiry dates
+        async function fetchExpiryDates(symbol) {
+            try {
+                const response = await fetch(`/get-expiry-dates?symbol=${symbol}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch expiry dates');
+                }
+                
+                const data = await response.json();
+                const expirySelect = document.getElementById('expirySelect');
+                expirySelect.innerHTML = '';
+                
+                data.expiry_dates.forEach(expiry => {
+                    const option = document.createElement('option');
+                    option.value = expiry;
+                    option.textContent = expiry;
+                    expirySelect.appendChild(option);
+                });
+                
+                if (data.expiry_dates.length > 0) {
+                    expirySelect.value = data.expiry_dates[0];
+                }
+                
+            } catch (error) {
+                console.error('Error fetching expiry dates:', error);
+                const expirySelect = document.getElementById('expirySelect');
+                expirySelect.innerHTML = '<option value="">Error loading</option>';
+            }
+        }
+
+        // Fetch historical data
+        async function fetchHistoricalData() {
+            const symbol = document.getElementById('symbolSelect').value;
+            const expiry = document.getElementById('expirySelect').value;
+            const date = document.getElementById('dateSelect').value;
+            const timeRange = document.getElementById('timeRangeSelect').value;
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const tableContainer = document.getElementById('historicalTableContainer');
+            const dataSummary = document.getElementById('dataSummary');
+
+            if (!expiry) return;
+
+            try {
+                loadingSpinner.classList.remove('hidden');
+                tableContainer.classList.add('hidden');
+                dataSummary.classList.add('hidden');
+
+                // Build query parameters
+                const params = new URLSearchParams({
+                    symbol: symbol,
+                    expiry: expiry,
+                    date: date,
+                    time_range: timeRange,
+                    start_time: startTime,
+                    end_time: endTime
+                });
+
+                const response = await fetch(`/get-historical-data?${params}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch historical data');
+                }
+
+                const data = await response.json();
+                currentData = data;
+
+                updateHistoricalTable(data.data);
+                updateDataSummary(data);
+                updateLastUpdateTime();
+
+                loadingSpinner.classList.add('hidden');
+                tableContainer.classList.remove('hidden');
+                dataSummary.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error fetching historical data:', error);
+                loadingSpinner.classList.add('hidden');
+                tableContainer.classList.remove('hidden');
+                dataSummary.classList.remove('hidden');
+                
+                // Show error message
+                const tbody = document.getElementById('historicalTableBody');
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-red-300 py-8">Error loading data. Please try again.</td></tr>';
+            }
+        }
+
+        // Update historical data table
+        function updateHistoricalTable(data) {
+            const tbody = document.getElementById('historicalTableBody');
+            tbody.innerHTML = '';
+
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-gray-300 py-8">No data available for the selected filters</td></tr>';
+                return;
+            }
+
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                
+                // Parse timestamp
+                const timestamp = new Date(item.timestamp);
+                const dateStr = timestamp.toLocaleDateString('en-IN', { 
+                    year: 'numeric', 
+                    month: '2-digit', 
+                    day: '2-digit' 
+                });
+                const timeStr = timestamp.toLocaleTimeString('en-IN', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: false 
+                });
+                
+                row.innerHTML = `
+                    <td>${dateStr}</td>
+                    <td>${timeStr}</td>
+                    <td>${item.current_price.toFixed(2)}</td>
+                    <td>${formatNumber(item.total_ce_oi_lots || item.total_ce_oi)}</td>
+                    <td>${formatNumber(item.total_pe_oi_lots || item.total_pe_oi)}</td>
+                    <td>${formatNumber(item.total_ce_volume_lots || item.total_ce_volume)}</td>
+                    <td>${formatNumber(item.total_pe_volume_lots || item.total_pe_volume)}</td>
+                    <td>${item.pcr.toFixed(2)}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        // Update data summary
+        function updateDataSummary(data) {
+            if (!data.data || data.data.length === 0) {
+                document.getElementById('totalRecords').textContent = '0';
+                document.getElementById('dateRange').textContent = '--';
+                document.getElementById('timeRange').textContent = '--';
+                document.getElementById('avgPCR').textContent = '0.00';
+                return;
+            }
+
+            const records = data.data;
+            const totalRecords = records.length;
+            
+            // Calculate date range
+            const dates = [...new Set(records.map(r => new Date(r.timestamp).toDateString()))];
+            const dateRange = dates.length === 1 ? dates[0] : `${dates[dates.length - 1]} to ${dates[0]}`;
+            
+            // Calculate time range
+            const times = records.map(r => new Date(r.timestamp).toTimeString().slice(0, 5));
+            const timeRange = `${times[times.length - 1]} to ${times[0]}`;
+            
+            // Calculate average PCR
+            const avgPCR = records.reduce((sum, r) => sum + r.pcr, 0) / totalRecords;
+
+            document.getElementById('totalRecords').textContent = totalRecords;
+            document.getElementById('dateRange').textContent = dateRange;
+            document.getElementById('timeRange').textContent = timeRange;
+            document.getElementById('avgPCR').textContent = avgPCR.toFixed(2);
+        }
+
+        // Update last update time
+        function updateLastUpdateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-IN', { 
+                timeZone: 'Asia/Kolkata',
+                hour12: false 
+            });
+            document.getElementById('lastUpdate').textContent = `Last update: ${timeString}`;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Populate date select
+            populateDateSelect();
+            
+            // Load initial data
+            const initialSymbol = document.getElementById('symbolSelect').value;
+            await fetchExpiryDates(initialSymbol);
+            await fetchHistoricalData();
+
+            // Event listeners
+            document.getElementById('symbolSelect').addEventListener('change', async function() {
+                const symbol = this.value;
+                await fetchExpiryDates(symbol);
+                await fetchHistoricalData();
+            });
+
+            document.getElementById('expirySelect').addEventListener('change', fetchHistoricalData);
+            document.getElementById('dateSelect').addEventListener('change', fetchHistoricalData);
+            document.getElementById('timeRangeSelect').addEventListener('change', function() {
+                const isCustom = this.value === 'custom';
+                document.getElementById('startTime').disabled = !isCustom;
+                document.getElementById('endTime').disabled = !isCustom;
+                if (isCustom) {
+                    fetchHistoricalData();
+                }
+            });
+
+            document.getElementById('startTime').addEventListener('change', fetchHistoricalData);
+            document.getElementById('endTime').addEventListener('change', fetchHistoricalData);
+            document.getElementById('filterButton').addEventListener('click', fetchHistoricalData);
+
+            // Auto-refresh every 5 minutes
+            setInterval(fetchHistoricalData, 300000);
+        });
+    </script>
+</body>
+</html> 

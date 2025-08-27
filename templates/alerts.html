@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alerts History - NSE Equity Project</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: white !important;
+            color: #1f2937 !important;
+        }
+        .header-section {
+            background: #f8fafc !important;
+            border-bottom: 1px solid #e5e7eb !important;
+        }
+        .controls-section {
+            background: #f8fafc !important;
+            border: 1px solid #e5e7eb !important;
+        }
+        .table-section {
+            background: white !important;
+            border: 1px solid #e5e7eb !important;
+        }
+        .symbol-select {
+            background: white !important;
+            color: #1f2937 !important;
+            font-weight: bold !important;
+            min-width: 120px !important;
+            border: 1px solid #d1d5db !important;
+        }
+        .symbol-select option {
+            background: white;
+            color: #1f2937;
+            padding: 8px;
+            font-weight: bold;
+        }
+        .alert-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .alert-table th,
+        .alert-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border: 1px solid #e5e7eb;
+            font-size: 14px;
+            font-weight: bold !important;
+        }
+        .alert-table th {
+            background: #f3f4f6;
+            font-weight: bold !important;
+            color: #1f2937;
+        }
+        .alert-table tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        .alert-table tr:hover {
+            background-color: #f3f4f6;
+        }
+        .regular-alert {
+            background-color: #fef3c7 !important;
+            border-left: 4px solid #f59e0b !important;
+        }
+        .special-alert {
+            background-color: #fee2e2 !important;
+            border-left: 4px solid #dc2626 !important;
+        }
+        .loading-spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-white">
+    <!-- Header -->
+    <header class="header-section">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Alerts History</h1>
+                    <p class="text-gray-600 text-sm font-bold">View all regular and special alerts</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <p class="text-gray-800 text-sm font-bold">Welcome, <span id="userEmail">{{ session.email }}</span></p>
+                        <p class="text-gray-600 text-xs font-bold" id="lastUpdate">Last update: --</p>
+                    </div>
+                    <a href="/options-chain" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors font-bold">
+                        Back to Options Chain
+                    </a>
+                    <a href="/logout" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors font-bold">
+                        Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Controls Section -->
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <div class="controls-section rounded-xl p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="flex flex-col space-y-2">
+                    <label class="text-gray-800 font-bold text-sm">Symbol:</label>
+                    <select id="symbolFilter" title="Filter by Symbol" class="symbol-select rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">All Symbols</option>
+                        {% for symbol in symbols %}
+                        <option value="{{ symbol }}">{{ symbol }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-gray-800 font-bold text-sm">Alert Type:</label>
+                    <select id="alertTypeFilter" title="Filter by Alert Type" class="symbol-select rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">All Alerts</option>
+                        <option value="regular">Regular Alerts (-100)</option>
+                        <option value="special">Special Alerts (-1500)</option>
+                    </select>
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-gray-800 font-bold text-sm">From Date:</label>
+                    <input type="date" id="fromDate" title="Select From Date" class="symbol-select rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-gray-800 font-bold text-sm">To Date:</label>
+                    <input type="date" id="toDate" title="Select To Date" class="symbol-select rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <div class="flex flex-col space-y-2">
+                    <label class="text-gray-800 font-bold text-sm">Actions:</label>
+                    <div class="flex space-x-2">
+                        <button id="filterBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors font-bold text-sm">
+                            Filter
+                        </button>
+                        <button id="clearFilterBtn" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-bold text-sm">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Section -->
+        <div class="controls-section rounded-xl p-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                <div>
+                    <div class="text-2xl font-bold text-blue-600" id="totalAlerts">0</div>
+                    <div class="text-gray-600 text-sm font-bold">Total Alerts</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-yellow-600" id="regularAlerts">0</div>
+                    <div class="text-gray-600 text-sm font-bold">Regular Alerts</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-red-600" id="specialAlerts">0</div>
+                    <div class="text-gray-600 text-sm font-bold">Special Alerts</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-green-600" id="filteredAlerts">0</div>
+                    <div class="text-gray-600 text-sm font-bold">Filtered Results</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="hidden flex justify-center items-center py-8">
+            <div class="loading-spinner"></div>
+            <span class="ml-3 text-gray-800 font-bold">Loading alerts...</span>
+        </div>
+
+        <!-- Alerts Table -->
+        <div id="alertsTableContainer" class="table-section rounded-xl p-6">
+            <div class="overflow-x-auto">
+                <table class="alert-table w-full">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Symbol</th>
+                            <th>Strike</th>
+                            <th>Type</th>
+                            <th>Alert Type</th>
+                            <th>OI Change</th>
+                            <th>Previous OI</th>
+                            <th>Current OI</th>
+                            <th>OI Drop</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alertsTableBody">
+                        <!-- Data will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- No Data Message -->
+            <div id="noDataMessage" class="hidden text-center py-8">
+                <p class="text-gray-600 font-bold">No alerts found for the selected criteria.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allAlerts = [];
+        let filteredAlerts = [];
+        
+        // Format numbers with commas
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        
+        // Format date and time
+        function formatDateTime(dateTimeStr) {
+            const date = new Date(dateTimeStr);
+            return date.toLocaleString('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+        
+        // Update stats
+        function updateStats() {
+            const total = allAlerts.length;
+            const regular = allAlerts.filter(alert => alert.alert_type === 'regular').length;
+            const special = allAlerts.filter(alert => alert.alert_type === 'special').length;
+            const filtered = filteredAlerts.length;
+            
+            document.getElementById('totalAlerts').textContent = total;
+            document.getElementById('regularAlerts').textContent = regular;
+            document.getElementById('specialAlerts').textContent = special;
+            document.getElementById('filteredAlerts').textContent = filtered;
+        }
+        
+        // Update the alerts table
+        function updateAlertsTable(alerts) {
+            const tbody = document.getElementById('alertsTableBody');
+            const noDataMessage = document.getElementById('noDataMessage');
+            
+            tbody.innerHTML = '';
+            
+            if (!alerts || alerts.length === 0) {
+                noDataMessage.classList.remove('hidden');
+                return;
+            }
+            
+            noDataMessage.classList.add('hidden');
+            
+            alerts.forEach(alert => {
+                const row = document.createElement('tr');
+                row.className = alert.alert_type === 'special' ? 'special-alert' : 'regular-alert';
+                
+                row.innerHTML = `
+                    <td class="font-bold">${formatDateTime(alert.timestamp)}</td>
+                    <td class="font-bold">${alert.symbol}</td>
+                    <td class="font-bold">${alert.strike || '--'}</td>
+                    <td class="font-bold">${alert.option_type || '--'}</td>
+                    <td class="font-bold">
+                        <span class="px-2 py-1 rounded text-xs ${alert.alert_type === 'special' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}">
+                            ${alert.alert_type === 'special' ? '🚨 Special' : '⚠️ Regular'}
+                        </span>
+                    </td>
+                    <td class="font-bold ${alert.oi_change < 0 ? 'text-red-600' : 'text-green-600'}">${formatNumber(alert.oi_change)}</td>
+                    <td class="font-bold">${alert.previous_oi ? formatNumber(alert.previous_oi) : '--'}</td>
+                    <td class="font-bold">${alert.current_oi ? formatNumber(alert.current_oi) : '--'}</td>
+                    <td class="font-bold">${alert.oi_drop ? formatNumber(alert.oi_drop) : '--'}</td>
+                    <td class="font-bold">
+                        <span class="px-2 py-1 rounded text-xs bg-green-100 text-green-800">
+                            Sent
+                        </span>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Apply filters
+        function applyFilters() {
+            const symbolFilter = document.getElementById('symbolFilter').value;
+            const alertTypeFilter = document.getElementById('alertTypeFilter').value;
+            const fromDate = document.getElementById('fromDate').value;
+            const toDate = document.getElementById('toDate').value;
+            
+            filteredAlerts = allAlerts.filter(alert => {
+                // Symbol filter
+                if (symbolFilter && alert.symbol !== symbolFilter) return false;
+                
+                // Alert type filter
+                if (alertTypeFilter && alert.alert_type !== alertTypeFilter) return false;
+                
+                // Date filter
+                if (fromDate || toDate) {
+                    const alertDate = new Date(alert.timestamp).toISOString().split('T')[0];
+                    if (fromDate && alertDate < fromDate) return false;
+                    if (toDate && alertDate > toDate) return false;
+                }
+                
+                return true;
+            });
+            
+            updateAlertsTable(filteredAlerts);
+            updateStats();
+        }
+        
+        // Clear filters
+        function clearFilters() {
+            document.getElementById('symbolFilter').value = '';
+            document.getElementById('alertTypeFilter').value = '';
+            document.getElementById('fromDate').value = '';
+            document.getElementById('toDate').value = '';
+            
+            filteredAlerts = [...allAlerts];
+            updateAlertsTable(filteredAlerts);
+            updateStats();
+        }
+        
+        // Load alerts data
+        async function loadAlerts() {
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const tableContainer = document.getElementById('alertsTableContainer');
+            
+            try {
+                loadingSpinner.classList.remove('hidden');
+                tableContainer.classList.add('hidden');
+                
+                const response = await fetch('/get-alerts-history');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch alerts');
+                }
+                
+                const data = await response.json();
+                allAlerts = data.alerts || [];
+                filteredAlerts = [...allAlerts];
+                
+                updateAlertsTable(filteredAlerts);
+                updateStats();
+                
+                // Update last update time
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('en-IN', { 
+                    timeZone: 'Asia/Kolkata',
+                    hour12: false 
+                });
+                document.getElementById('lastUpdate').textContent = `Last update: ${timeString}`;
+                
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+                allAlerts = [];
+                filteredAlerts = [];
+                updateAlertsTable([]);
+                updateStats();
+            } finally {
+                loadingSpinner.classList.add('hidden');
+                tableContainer.classList.remove('hidden');
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load initial data
+            loadAlerts();
+            
+            // Set default date range (last 7 days)
+            const today = new Date();
+            const sevenDaysAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
+            
+            document.getElementById('toDate').value = today.toISOString().split('T')[0];
+            document.getElementById('fromDate').value = sevenDaysAgo.toISOString().split('T')[0];
+            
+            // Event listeners
+            document.getElementById('filterBtn').addEventListener('click', applyFilters);
+            document.getElementById('clearFilterBtn').addEventListener('click', clearFilters);
+            
+            // Auto-refresh every 2 minutes
+            setInterval(loadAlerts, 120000); // 2 minutes
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: equity-updated
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: KITE_API_KEY
+        value: tmp23p1tsmywqb5s
+      - key: KITE_API_SECRET
+        value: d1lkd7orpowxrdm4ff6l4fnctp0cjmh9
+      - key: KITE_ACCESS_TOKEN
+        value: pgn2d2uNCDgt1nweUUhCkG7VAC44kmxM
+      - key: MONGODB_URI
+        value: mongodb+srv://hello:Hello123@option-chain.15yln1l.mongodb.net/?retryWrites=true&w=majority&appName=Option-chain
+      - key: SMTP_SERVER
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        value: kondareddyroopa667@gmail.com
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: FLASK_SECRET_KEY
+        value: your-secret-key-here-change-in-production
+      - key: ENVIRONMENT
+        value: production

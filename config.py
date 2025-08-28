@@ -13,7 +13,7 @@ class Config:
     # KiteConnect API Configuration
     KITE_API_KEY = os.environ.get('KITE_API_KEY') or 'tmp23p1tsmywqb5s'
     KITE_API_SECRET = os.environ.get('KITE_API_SECRET') or 'd1lkd7orpowxrdm4ff6l4fnctp0cjmh9'
-    KITE_ACCESS_TOKEN = os.environ.get('KITE_ACCESS_TOKEN') or 'pgn2d2uNCDgt1nweUUhCkG7VAC44kmxM'
+    KITE_ACCESS_TOKEN = os.environ.get('KITE_ACCESS_TOKEN') or 'kX69S2Ny9K7QBBNAWO3AinX3rwB0YMYR'
     
     # MongoDB Configuration
     MONGODB_URI = os.environ.get('MONGODB_URI') or 'mongodb+srv://hello:Hello123@option-chain.15yln1l.mongodb.net/?retryWrites=true&w=majority&appName=Option-chain'
